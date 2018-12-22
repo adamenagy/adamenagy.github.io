@@ -1,6 +1,238 @@
-<html>
-<header> </header>
+<head>
+    <meta name="viewport" content="width=device-width, minimum-scale=1.0, initial-scale=1, user-scalable=no" />
+    <meta charset="utf-8">
+    <link rel="icon" href="favicon.ico" type="image/x-icon" />
+    
+
+    <!-- The Viewer CSS -->
+    <!--
+        <link rel="stylesheet" href="https://developer.api.autodesk.com/viewingservice/v1/viewers/style.min.css?v=v2.16" type="text/css">
+    -->
+    <link rel="stylesheet" href="https://developer.api.autodesk.com/modelderivative/v2/viewers/style.min.css?v=6.1" type="text/css">
+
+    <!-- Developer CSS -->
+    <style>
+        body {
+            margin: 0;
+        }
+
+        #MyViewerDiv {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            background-color: #F0F8FF;
+        }
+    </style>
+
+    <title>Showing A360 Shared files</title>
+</head>
+
 <body>
-Test :)
+
+    <!-- The Viewer will be instantiated here -->
+    <div id="MyViewerDiv"></div>
+
+    <!-- The Viewer JS -->
+    <!--
+        <script src="https://developer.api.autodesk.com/viewingservice/v1/viewers/three.min.js?v=v2.16"></script>
+        <script src="https://developer.api.autodesk.com/viewingservice/v1/viewers/viewer3D.js?v=v2.16"></script>
+    -->
+    <script src="https://developer.api.autodesk.com/modelderivative/v2/viewers/viewer3D.js?v=v6.1"></script>
+
+    <!-- jQuery -->
+    <script src="https://code.jquery.com/jquery-3.2.1.min.js" integrity="sha256-hwg4gsxgFZhOsEEamdOYGBf13FyQuiTwlAQgxVSNgt4=" crossorigin="anonymous"></script>
+
+    <!-- Developer JS -->
+    <script>
+        // This is the iframe URL that shows up when sharing a model with embed option
+        // from the A360 web site
+        //var embedURLfromA360 = 'https://myhub.autodesk360.com/ue29c8b6b/shares/public/SH7f1edQT22b515c761efc45b931173defe6?mode=embed'; // ParametricChair
+        //var embedURLfromA360 = 'https://myhub.autodesk360.com/ue2841673/shares/public/SHabee1QT1a327cf2b7a0b1b62ca0ae9ec8f?mode=embed'; // ParametricChair
+        var embedURLfromA360 = "https://myhub.autodesk360.com/ue29c8b6b/shares/public/SH7f1edQT22b515c761e590302ef08fe5104?mode=embed";
+
+        var viewer;
+
+        function getURN(onURNCallback) {
+            $.get({
+                url: embedURLfromA360.replace('public', 'metadata').replace('mode=embed', ''),
+                dataType: 'json',
+                success: function (metadata) {
+                    if (onURNCallback) {
+                        onURNCallback(metadata.success.body.viewing.views.viewableUrn);
+                    }
+                }
+            })
+        }
+
+        function getForgeToken(onTokenCallback) {
+            $.post({
+                url: embedURLfromA360.replace('public', 'sign').replace('mode=embed', 'oauth2=true'),
+                data: '{}',
+                success: function (oauth) {
+                    if (onTokenCallback)
+                        onTokenCallback(oauth.accessToken, oauth.validitySeconds);
+                }
+            });
+        }
+
+        getURN(function (urn) {
+            var options = {
+                env: 'AutodeskProduction',
+                getAccessToken: getForgeToken
+            };
+            var documentId = 'urn:' + urn;
+            Autodesk.Viewing.Initializer(options, function onInitialized() {
+                Autodesk.Viewing.Document.load(documentId, onDocumentLoadSuccess, onDocumentLoadFailure);
+            });
+        });
+
+        /**
+         * Autodesk.Viewing.Document.load() success callback.
+         * Proceeds with model initialization.
+         */
+        function onDocumentLoadSuccess(doc) {
+
+            // A document contains references to 3D and 2D viewables.
+            var viewables = Autodesk.Viewing.Document.getSubItemsWithProperties(doc.getRootItem(), {
+                'type': 'geometry'
+            }, true);
+            if (viewables.length === 0) {
+                console.error('Document contains no viewables.');
+                return;
+            }
+
+            // Choose any of the avialble viewables
+            var initialViewable = viewables[0];
+            var svfUrl = doc.getViewablePath(initialViewable);
+            var modelOptions = {
+                sharedPropertyDbPath: doc.getPropertyDbPath()
+            };
+
+            var viewerDiv = document.getElementById('MyViewerDiv');
+            viewer = new Autodesk.Viewing.Private.GuiViewer3D(viewerDiv);
+            viewer.start(svfUrl, modelOptions, onLoadModelSuccess, onLoadModelError);
+
+            viewer.addEventListener(Autodesk.Viewing.SIDE_BAR_OPEN_EVENT, onSelectionChanged)
+            viewer.addEventListener(Autodesk.Viewing.SELECTION_CHANGED_EVENT, onSelectionChanged)
+            Autodesk.Viewing.UI.PropertyPanel.prototype.onPropertyClick = onPropertyClick
+        }
+
+        /**
+         * Autodesk.Viewing.Document.load() failuire callback.
+         */
+        function onDocumentLoadFailure(viewerErrorCode) {}
+
+        /**
+         * viewer.loadModel() success callback.
+         * Invoked after the model's SVF has been initially loaded.
+         * It may trigger before any geometry has been downloaded and displayed on-screen.
+         */
+        function onLoadModelSuccess(model) {}
+
+        /**
+         * viewer.loadModel() failure callback.
+         * Invoked when there's an error fetching the SVF file.
+         */
+        function onLoadModelError(viewerErrorCode) {}
+
+        function onSelectionChanged(event) {
+            // Let's only control selection in case of
+            // single user selection
+            if (event.dbIdArray.length === 1) {
+                viewer.getProperties(event.dbIdArray[0], function(data) {
+                    console.log(data.name)
+                    if (data.name.startsWith("Body") || data.name.startsWith("#")) {
+                        var instanceTree = viewer.model.getData().instanceTree;
+                        var parentId = instanceTree.getNodeParentId(event.dbIdArray[0])
+                        viewer.select([parentId]);
+                    }
+                })
+            }
+        }
+
+        function getSubset(dbIds, name, value, callback) {
+            console.log("getSubset, dbIds.length before = " + dbIds.length)
+            viewer.model.getBulkProperties(dbIds, {
+                propFilter: [name],
+                ignoreHidden: true
+            }, function(data) {
+                var newDbIds = []
+                for (var key in data) {
+                    var item = data[key]
+                    if (item.properties[0].displayValue === value) {
+                        newDbIds.push(item.dbId)
+                    }
+                }
+
+                console.log("getSubset, dbIds.length after = " + newDbIds.length)
+
+                callback(newDbIds)
+
+            }, function(error) {})
+        }
+
+        function onPropertyClick(property, event) {
+            console.log(property.name + " = " + property.value)
+            viewer.search('"' + property.value + '"', function(dbIds) {
+                console.log(dbIds.length);
+                getSubset(dbIds, property.name, property.value, function(dbIds) {
+                    viewer.isolate(dbIds)
+                })
+            }, function(error) {}, null)
+        }
+
+        // https://forge.autodesk.com/blog/event-monitor-viewer
+        function subscribeToAllEvents (viewer) {
+            for (var key in Autodesk.Viewing) {
+                if (key.endsWith("_EVENT")) {
+                    (function(eventName) {
+                    viewer.addEventListener(
+                            Autodesk.Viewing[eventName],
+                            function (event) {
+                                console.log(eventName, event);
+                            }
+                        );
+                    })(key);
+                }
+            }
+        }
+
+        // https://forge.autodesk.com/cloud_and_mobile/2015/02/managing-viewer-states-from-the-api.html
+        var viewerState;
+        function storeState() {
+            viewerState = viewer.getState();
+        }
+
+        function restoreState() {
+            console.log('>>> before restoreState');
+            viewer.restoreState(viewerState);
+            console.log('>>> after restoreState');
+        }
+
+        async function restoreStatePromise() {
+            var restorePromise = new Promise(function (resolve, reject) {
+                var listener = function (event) {
+                    if (event.value.finalFrame) {
+                        viewer.removeEventListener(
+                            Autodesk.Viewing.FINAL_FRAME_RENDERED_CHANGED_EVENT,
+                            listener
+                        );
+                        resolve();
+                    }
+                }
+
+                // Wait for reloads because of camera changes
+                viewer.addEventListener(
+                    Autodesk.Viewing.FINAL_FRAME_RENDERED_CHANGED_EVENT,
+                    listener
+                );
+
+                viewer.restoreState(viewerState);
+            });
+
+            console.log('>>> before restorePromise');
+            await restorePromise;
+            console.log('>>> after restorePromise');
+        }
+    </script>
 </body>
-</html>
