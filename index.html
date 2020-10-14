@@ -9,7 +9,7 @@
     <!--
         <link rel="stylesheet" href="https://developer.api.autodesk.com/viewingservice/v1/viewers/style.min.css?v=v2.16" type="text/css">
     -->
-    <link rel="stylesheet" href="https://developer.api.autodesk.com/modelderivative/v2/viewers/style.min.css?v=6.1" type="text/css">
+    <link rel="stylesheet" href="https://developer.api.autodesk.com/modelderivative/v2/viewers/7.*/style.min.css" type="text/css">
 
     <!-- Developer CSS -->
     <style>
@@ -38,7 +38,7 @@
         <script src="https://developer.api.autodesk.com/viewingservice/v1/viewers/three.min.js?v=v2.16"></script>
         <script src="https://developer.api.autodesk.com/viewingservice/v1/viewers/viewer3D.js?v=v2.16"></script>
     -->
-    <script src="https://developer.api.autodesk.com/modelderivative/v2/viewers/viewer3D.js?v=v6.1"></script>
+    <script src="https://developer.api.autodesk.com/modelderivative/v2/viewers/7.*/viewer3D.js"></script>
 
     <!-- jQuery -->
     <script src="https://code.jquery.com/jquery-3.2.1.min.js" integrity="sha256-hwg4gsxgFZhOsEEamdOYGBf13FyQuiTwlAQgxVSNgt4=" crossorigin="anonymous"></script>
@@ -88,6 +88,56 @@
             });
         });
 
+const nodeIdToFragIds = (model, nodeId) => {
+    var instanceTree = model.getData().instanceTree;
+
+    var fragIds = [];
+    instanceTree.enumNodeFragments(nodeId, (fragId) => {
+      fragIds = [...fragIds, fragId];
+    });
+
+    return fragIds;
+  } 
+
+ const overrideOpacity = (model, dbIds, material) => {
+    const fragList = model.getFragmentList();
+    
+    dbIds.forEach((dbId) => {
+      const fragIds = nodeIdToFragIds(model, dbId);
+  
+      fragIds.forEach((fragId) => {
+        fragList.setMaterial(fragId, material)
+          /*
+        const material = fragList.getMaterial(fragId);
+
+        if (material) {
+          material.opacity = 0.5;
+          material.transparent = true;
+          material.needsUpdate = true;
+        }
+        */
+      });
+    });
+    viewer.impl.invalidate(true);
+
+    return true;
+  };
+
+  function test() {
+    newMaterial = () => { 
+        var color = new THREE.Color(0xff0000);     
+        var material = new THREE.MeshPhongMaterial({       
+            color: color,       
+            opacity: 0.3,       
+            transparent: true,     
+        });     
+        viewer.impl.matman().addMaterial("ColorMaterial-" + new Date().getDate(), material, true);     
+        return material;   
+      };  
+      //and set fragList.setMaterial(fragId, this.material)
+      overrideOpacity(viewer.model, viewer.getSelection(), newMaterial())
+  }
+
         /**
          * Autodesk.Viewing.Document.load() success callback.
          * Proceeds with model initialization.
@@ -95,7 +145,7 @@
         function onDocumentLoadSuccess(doc) {
 
             // A document contains references to 3D and 2D viewables.
-            var viewables = Autodesk.Viewing.Document.getSubItemsWithProperties(doc.getRootItem(), {
+            var viewables = doc.getRoot().search({
                 'type': 'geometry'
             }, true);
             if (viewables.length === 0) {
@@ -107,7 +157,7 @@
             var initialViewable = viewables[0];
             var svfUrl = doc.getViewablePath(initialViewable);
             var modelOptions = {
-                sharedPropertyDbPath: doc.getPropertyDbPath()
+                //sharedPropertyDbPath: doc.getPropertyDbPath()
             };
 
             var viewerDiv = document.getElementById('MyViewerDiv');
@@ -239,3 +289,4 @@
     </script>
 </body>
 </html>
+<!-- adamenagy.github.io -->
