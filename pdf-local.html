@@ -1,0 +1,70 @@
+<html>
+  <head>
+    <meta
+      name="viewport"
+      content="width=device-width, minimum-scale=1.0, initial-scale=1, user-scalable=no"
+    />
+    <meta charset="utf-8" />
+
+    <!-- The Viewer CSS -->
+    <link
+      rel="stylesheet"
+      href="https://developer.api.autodesk.com/modelderivative/v2/viewers/7.*/style.min.css"
+      type="text/css"
+    />
+
+    <!-- Developer CSS -->
+    <style>
+      body {
+        margin: 0;
+      }
+
+      #MyConytainerDiv {
+        width: 100%;
+        height: 100%;
+        position: relative;
+      }
+
+      #MyViewerDiv {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        background-color: #f0f8ff;
+      }
+    </style>
+
+    <title>Showing A360 Shared files</title>
+  </head>
+
+  <body>
+    <!-- The Viewer will be instantiated here -->
+    <div id="MyConytainerDiv">
+      <div id="MyViewerDiv"></div>
+    </div>
+
+    <!-- The Viewer JS -->
+    <script src="https://developer.api.autodesk.com/modelderivative/v2/viewers/7.53/viewer3D.js"></script>
+
+    <!-- jQuery -->
+    <script
+      src="https://code.jquery.com/jquery-3.2.1.min.js"
+      integrity="sha256-hwg4gsxgFZhOsEEamdOYGBf13FyQuiTwlAQgxVSNgt4="
+      crossorigin="anonymous"
+    ></script>
+
+    <!-- Developer JS -->
+    <script>
+      var viewer;
+
+      var options = {
+        env: "Local"
+      };
+      Autodesk.Viewing.Initializer(options, function onInitialized() {
+        var viewerDiv = document.getElementById("MyViewerDiv");
+        viewer = new Autodesk.Viewing.GuiViewer3D(viewerDiv);
+        viewer.start();
+        viewer.loadModel("https://d272-81-105-47-137.ngrok.io/scissors1.pdf?documentId=1234");
+      });
+    </script>
+  </body>
+</html>
